@@ -105,7 +105,7 @@ class Game:
         self.max_ep_len = self.env.max_steps
 
         prefix = task_info[task]['description'] + task_info[task]['example']
-        self.teacher_policy = TeacherPolicy(task, offline, soft, prefix, self.action_space, self.env.agent_view_size)
+        self.teacher_policy = TeacherPolicy(task, offline, soft, prefix, self.action_space, self.env.agent_view_size, self.LLM_noise, self.LLM_noise_ratio, pi_teacher_noise = self.pi_teacher_noise, noise_ratio = self.pi_teacher_noise_ratio)
 
             
     def train(self):
@@ -132,10 +132,12 @@ class Game:
             ## training ##
             self.train_step += 1
             optimizer_start = time.time()
+            mean_teacher_loss = self.teacher_value_network.update_policy(self.buffer, self.max_ep_len)
             mean_losses = self.student_policy.update_policy(self.buffer)
+            
             opt_time = time.time() - optimizer_start
             try:
-                print("{:.2f} s to optimizer| loss {:6.3f}, entropy {:6.3f}, kickstarting {:6.3f}.".format(opt_time, mean_losses[0], mean_losses[1], mean_losses[2]))
+                print("{:.2f} s to optimizer| loss {:6.3f}, entropy {:6.3f}, kickstarting {:6.3f}, q_teacher loss".format(opt_time, mean_losses[0], mean_losses[1], mean_losses[2], mean_teacher_loss))
             except:
                 print(mean_losses)
 
@@ -194,6 +196,7 @@ class Game:
                 self.logger.add_scalar("Train/Policy Loss", mean_losses[3], itr)
                 self.logger.add_scalar("Train/Value Loss", mean_losses[4], itr)
                 self.logger.add_scalar("Train/Kickstarting Coef", self.student_policy.ks_coef, itr)
+                self.logger.add_scalar("Train/q teacher loss", mean_teacher_loss, itr)
                 
         self.student_policy.save()
 
@@ -240,13 +243,10 @@ class Game:
                 else:
                     teacher_value = None
 
-                # update teacher value network
-                if self.itr % 100 == 1:
-                    teacher_loss = self.teacher_value_network.train_step(torch.Tensor(obs).to(self.device), torch.Tensor(next_obs).to(self.device), reward, self.max_ep_len)
-                    self.logger.add_scalar("Teacher loss", teacher_loss, self.itr)
 
                 # store in buffer
                 self.buffer.store(obs, 
+                                  next_obs,
                                   action, 
                                   reward, 
                                   value.to("cpu").numpy(), 

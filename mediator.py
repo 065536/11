@@ -175,7 +175,7 @@ class Base_Mediator(ABC):
                 noise = noise*self.LLM_noise_ratio
                 if carrying == self.hold_items[i]:
                     noise += 1
-                probs_hold.append(noise)
+                probs_hold.append(noise.item())
             probs_hold = [x / sum(probs_hold) for x in probs_hold]
 
             probs_see = []
@@ -184,7 +184,7 @@ class Base_Mediator(ABC):
                 noise = noise*self.LLM_noise_ratio
                 if carrying == self.see_items[i]:
                     noise += 1
-                probs_see.append(noise)
+                probs_see.append(noise.item())
             probs_see = [x / sum(probs_see) for x in probs_see]
             
             index_hold = np.random.choice(len(probs_hold), p=probs_hold)
@@ -192,6 +192,7 @@ class Base_Mediator(ABC):
 
             carrying = self.hold_items[index_hold]
             context = self.see_items[index_see]
+            context = f"<{context}>, "
             
 
         if context == '':

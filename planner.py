@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 class Base_Planner(ABC):
     """The base class for Planner."""
 
-    def __init__(self, pi_teacher_noise = "gaussian", noise_ratio = 0.2, offline=True, soft=False, prefix=''):
+    def __init__(self, offline=True, soft=False, prefix='', pi_teacher_noise = "gaussian", noise_ratio = 0.2):
         super().__init__()
         self.offline = offline
         self.soft = soft
@@ -147,13 +147,17 @@ class Base_Planner(ABC):
     def __call__(self, obs):
         # self.mediator.reset()
         text = self.mediator.RL2LLM(obs)
-        l_choices = self.choices[text]
-        s_choices = '['
-        for i in l_choices:
-            i = f"'{i}', "
-            s_choices += i
-        s_choices += ']'
-        addition_string = f"Choose the next rational action from {s_choices}. No further explanation."
+        try:
+            l_choices = self.choices[text]
+            s_choices = '['
+            for i in l_choices:
+                i = f"'{i}', "
+                s_choices += i
+            s_choices += ']'
+            addition_string = f"Choose the next rational action from {s_choices}. No further explanation."
+            
+        except:
+            addition_string = "The observation is corrupted. Choose a possible action from ['explore','pick up <key>', 'go to <door>', 'open <door>']"
         text += addition_string
         plans, probs = self.plan(text)
         self.dialogue_user = text + "\n" + str(plans) + "\n" + str(probs)
@@ -166,9 +170,9 @@ class Base_Planner(ABC):
     
 
 class SimpleDoorKey_Planner(Base_Planner):
-    def __init__(self, offline, soft, prefix):
+    def __init__(self, offline, soft, prefix, LLM_noise = "False", LLM_noise_ratio = 0.2):
         super().__init__(offline, soft, prefix)
-        self.mediator = SimpleDoorKey_Mediator(soft)
+        self.mediator = SimpleDoorKey_Mediator(soft, LLM_noise = LLM_noise, LLM_noise_ratio = LLM_noise_ratio)
         if offline:
             self.plans_dict = {
                 "Agent sees <nothing>, holds <nothing>." : [["explore"], [1.0]],
@@ -278,9 +282,9 @@ class TwoDoor_Planner(Base_Planner):
             }  
                                                             
                                                             
-def Planner(task, offline=True, soft=False, prefix=''):
+def Planner(task, offline=True, soft=False, prefix='', LLM_noise = "False", LLM_noise_ratio = 0.2, pi_teacher_noise = "gaussian", noise_ratio = 0.2):
     if task.lower() == "simpledoorkey":
-        planner = SimpleDoorKey_Planner(offline, soft, prefix)
+        planner = SimpleDoorKey_Planner(offline, soft, prefix, LLM_noise = LLM_noise, LLM_noise_ratio = LLM_noise_ratio, pi_teacher_noise = pi_teacher_noise, noise_ratio = noise_ratio)
     elif task.lower() == "lavadoorkey":
         planner = SimpleDoorKey_Planner(offline, soft, prefix)
     elif task.lower() == "coloreddoorkey":
